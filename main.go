@@ -16,6 +16,13 @@ type CountTracker struct {
 	allCounts     int
 }
 
+func NewCountTracker() *CountTracker {
+	return &CountTracker{
+		targetToCount: map[string]int{},
+		allCounts:     0,
+	}
+}
+
 func (ct *CountTracker) Increment(value string) {
 	ct.targetToCount[value]++
 	ct.allCounts++
@@ -76,7 +83,7 @@ func main() {
 	}
 	defer f.Close()
 
-	countTracker := CountTracker{map[string]int{}, 0}
+	countTracker := NewCountTracker()
 	scanner := bufio.NewScanner(f)
 	var counter Counter
 
@@ -92,8 +99,8 @@ func main() {
 	var nlines int
 	fmt.Printf("\n")
 	for scanner.Scan() {
-		counter.Count(scanner.Text(), &countTracker)
-		chart, chartLen := generateChart(countTracker, *config)
+		counter.Count(scanner.Text(), countTracker)
+		chart, chartLen := generateChart(*countTracker, *config)
 
 		createTerminalSpace(chartLen + 1)
 		saveCursorPosition()
@@ -125,15 +132,15 @@ func generateChart(ct CountTracker, config Config) (string, int) {
 	targets = targets[:limit]
 
 	var b strings.Builder
-	targetsLen := longestTargetLen(targets)
+	targetsLen := maxRuneCount(targets)
 	var ratio float64
 	for i, t := range targets {
 		perc := float64(targetToCount[t]) / float64(ct.AllCounts())
 		if i == 0 {
 			ratio = float64(config.chartWidth) / perc
 		}
-		spaces := targetsLen - utf8.RuneCountInString(t)
-		fmt.Fprintf(&b, "%s %s ", strings.Repeat(" ", spaces), t)
+		leftPad := targetsLen - utf8.RuneCountInString(t)
+		fmt.Fprintf(&b, "%s %s ", strings.Repeat(" ", leftPad), t)
 		fmt.Fprintf(&b, strings.Repeat(string(config.barChar), int(ratio*perc)))
 		if config.showPercentage {
 			fmt.Fprintf(&b, " %.2f%%", 100.00*perc)
@@ -150,14 +157,14 @@ func Usage() {
 	flag.PrintDefaults()
 }
 
-func longestTargetLen(targets []string) int {
-	longestLen := 0
-	for _, t := range targets {
-		if tlen := utf8.RuneCountInString(t); tlen > longestLen {
-			longestLen = tlen
+func maxRuneCount(strings []string) int {
+	longest := 0
+	for _, s := range strings {
+		if count := utf8.RuneCountInString(s); count > longest {
+			longest = count
 		}
 	}
-	return longestLen
+	return longest
 }
 
 func createTerminalSpace(nlines int) {
